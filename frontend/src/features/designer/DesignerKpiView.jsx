@@ -202,7 +202,7 @@ export default function DesignerKpiView({ currentUser, selectedEntity }) {
             <p className="py-8 text-center text-[12px] text-[#6B6B73]"
               data-testid="designer-kpi-loading">Memuat KPI desainer…</p>
           ) : (
-            <div className="grid grid-cols-2 gap-2 md:grid-cols-6"
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-8"
               data-testid="designer-kpi-summary">
               <Kpi label="Desainer aktif" value={String(sum.designers ?? 0)} />
               <Kpi label="Round dikerjakan" value={String(sum.rounds ?? 0)} tone="#0058CC" />
@@ -213,6 +213,13 @@ export default function DesignerKpiView({ currentUser, selectedEntity }) {
               <Kpi label="Nunggak lewat tenggat" value={String(sum.overdue_now ?? 0)}
                 tone={(sum.overdue_now ?? 0) > 0 ? "#C0392B" : "#1B7F4B"} />
               <Kpi label="Biaya sample" value={formatCurrency(sum.cost_total || 0)} />
+              <Kpi label="Nilai desain rata (0–2)" testId="designer-kpi-summary-design-score"
+                value={sum.design_avg_score === null || sum.design_avg_score === undefined ? "—"
+                  : `${String(sum.design_avg_score).replace(".", ",")} · ${sum.design_versions ?? 0} versi`}
+                tone={(sum.design_avg_score ?? 0) >= 1.5 ? "#1B7F4B" : "#B26A00"} />
+              <Kpi label="Revisi desain / ACC" testId="designer-kpi-summary-design-revisions"
+                value={`${sum.design_revisions ?? 0} / ${sum.design_acc ?? 0}`}
+                tone={(sum.design_revisions ?? 0) > (sum.design_acc ?? 0) ? "#C0392B" : "#1B7F4B"} />
             </div>
           )}
 
@@ -349,9 +356,9 @@ export default function DesignerKpiView({ currentUser, selectedEntity }) {
   );
 }
 
-function Kpi({ label, value, tone = "#1C1C1E" }) {
+function Kpi({ label, value, tone = "#1C1C1E", testId }) {
   return (
-    <div className="rounded-lg border border-[#EFF0F2] bg-[#FAFBFC] p-2">
+    <div className="rounded-lg border border-[#EFF0F2] bg-[#FAFBFC] p-2" data-testid={testId}>
       <p className="text-[9.5px] font-bold uppercase text-[#8E8E93]">{label}</p>
       <p className="text-[13px] font-bold leading-tight tabular-nums" style={{ color: tone }}>
         {value}

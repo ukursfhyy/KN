@@ -91,7 +91,7 @@ export const HUB_TABS = {
     // PALING DEPAN karena inilah pintu kerja harian peran `designer`.
     { view: "design-requests",   label: "Permintaan Desain",  roles: ["admin", "manager", "designer"] },
     { view: "designer-kpi",      label: "KPI Desainer",       roles: ["admin", "manager"] },
-    { view: "rnd-designs",       label: "Desain & Pattern",   roles: ["admin", "manager"] },
+    { view: "rnd-designs",       label: "Desain & Pattern",   roles: ["admin", "manager", "designer"] },
     { view: "cs-design-gallery", label: "Galeri Desain + AI", roles: ["admin", "manager"] },
     { view: "rnd-divisions",     label: "Divisi & Persetujuan", roles: ["admin", "manager"] },
   ],

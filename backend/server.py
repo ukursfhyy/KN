@@ -204,6 +204,8 @@ app.include_router(interco.router)
 app.include_router(interco_loans.router)       # FASE E-7 (E7f) — pinjaman antar-PT
 app.include_router(internal_requests.router)  # FASE E-7 (E7d) — Permintaan Internal
 app.include_router(design_requests.router)    # FASE D — Permintaan Desain + rapor desainer
+from routers import design_studio as _design_studio  # noqa: E402 — Design Studio (lifecycle, nilai, colorway)
+app.include_router(_design_studio.router)
 from routers import logistics as _logistics_router   # noqa: E402
 app.include_router(_logistics_router.router)  # FB-02 — Modul Logistik (pengiriman, foto muat/POD, posisi)
 app.include_router(inspections.router)        # FASE I — Inspeksi & QC sebagai dokumen

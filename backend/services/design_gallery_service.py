@@ -32,7 +32,8 @@ DESIGN_TYPES = ("motif", "pattern", "artwork")
 # digambar desainer tak bisa dibedakan dari yang siap disahkan — dan antrean
 # keputusan tidak mungkin menghitungnya tanpa menyebut pekerjaan orang sebagai
 # antrean (alasan pembebasan lama di `verify_approval_queues.DOOR_EXEMPT`).
-DESIGN_STATUSES = ("draft", "pending_approval", "approved", "retired")
+DESIGN_STATUSES = ("draft", "pending_approval", "in_review", "revision", "approved",
+                   "active", "archived", "retired")
 
 
 async def _next_design_code(title: str, entity_id: str) -> str:
@@ -118,62 +119,82 @@ async def clear_rating(gallery_id: str, user_id: str) -> Dict[str, Any]:
     return _rating_fields(doc, user_id)
 
 
-async def create_gallery(payload: Dict[str, Any], actor_name: str, entity_id: str) -> Dict[str, Any]:
+async def create_gallery(payload: Dict[str, Any], actor_name: str, entity_id: str,
+                         actor: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    from services import design_studio_service as studio
     title = (payload.get("title") or "").strip()
     if not title:
         raise ValueError("Judul motif wajib diisi.")
-    # FASE F (PS-14) — perluasan menjadi MASTER DESAIN: kode unik, versi, jenis,
-    # dan atribut printing (repeat/jumlah warna/screen). Additive: entri lama tetap sah.
-    code = (payload.get("code") or "").strip().upper()
-    if code and await db.design_gallery.find_one({"code": code, "entity_id": entity_id},
-                                                 {"_id": 0, "id": 1}):
-        raise ValueError(f"Kode desain '{code}' sudah dipakai pada entitas ini.")
-    if not code:
-        # FASE D (DRIFT D4) — kode desain WAJIB ada. Terukur 2026-08-20: 2 dari 4
-        # entri galeri demo ber-`code` kosong, dan entri tanpa kode tidak bisa
-        # disebut di percakapan ("pakai motif yang mana?"), tidak bisa dicari, dan
-        # tidak bisa dirujuk dokumen lain. Dibuatkan otomatis dari judulnya
-        # (`DSG-<SLUG>-NN`, unik per badan usaha) supaya kewajiban ini tidak
-        # menambah pekerjaan pengunggah.
-        code = await _next_design_code(title, entity_id)
     dtype = (payload.get("design_type") or "motif").strip().lower()
     if dtype not in DESIGN_TYPES:
         raise ValueError(f"Jenis desain harus salah satu: {', '.join(DESIGN_TYPES)}.")
+    cat_code = (payload.get("category_code") or "").strip().upper()
+    category = await studio.category_of(dtype, cat_code) if cat_code else None
+    if cat_code and not category:
+        raise ValueError(f"Kategori '{cat_code}' tidak ada untuk jenis {dtype}.")
+    # Design Studio — kode dibentuk OTOMATIS dari pola terkonfigurasi (bukan ketik bebas).
+    code_info = await studio.next_code(entity_id, actor or {"name": actor_name}, dtype, cat_code)
+    code = code_info["code"]
+    if await db.design_gallery.find_one({"code": code, "entity_id": entity_id}, {"_id": 0, "id": 1}):
+        raise ValueError(f"Kode desain '{code}' sudah dipakai pada entitas ini.")
+    colors = await studio.resolve_colors(payload.get("colors") or [])
+    products = await studio.resolve_products(payload.get("recommended_product_ids") or [])
+    tags = _clean_tags(payload.get("tags"))
+    await studio.remember_tags(tags)
+    actor_doc = actor or {"name": actor_name}
     doc = {
         "id": new_id("dsgn"),
         "title": title, "story": payload.get("story", ""),
-        "tags": _clean_tags(payload.get("tags")),
+        "tags": tags,
         "files": [], "product_id": payload.get("product_id", ""),
         "code": code, "design_type": dtype, "version": 1, "status": "draft",
+        "category_code": cat_code, "category_name": (category or {}).get("name", ""),
+        "designer_code": code_info["designer_code"],
+        "recommended_products": products,
+        "recommended_product_ids": [p["id"] for p in products],
+        "colors": colors, "colorways": [], "feedback": [],
         # FASE L — lini kerja MD desain (kosong = belum bergolong, tetap terlihat semua).
         "line_code": _lines.norm(payload.get("line_code")),
         "repeat_cm": payload.get("repeat_cm"),
-        "color_count": int(payload.get("color_count") or 0),
+        "color_count": int(payload.get("color_count") or 0) or len(colors),
         "screen_count": int(payload.get("screen_count") or 0),
         "versions": [{"version": 1, "note": "Versi awal", "at": now_iso(),
-                      "by": actor_name, "files": []}],
-        "approved_by": "", "approved_at": "",
+                      "by": actor_name, "files": [], "score": None}],
+        "timeline": [studio.event(actor_doc, "created", "Desain dibuat", to_status="draft", version=1)],
+        "approved_by": "", "approved_at": "", "final_score": None,
         "ratings": [],
         "ai_meta": {"enabled": False, "model": "", "tags": [], "summary": "",
                     "attributes": {}, "analyzed_at": ""},
         "entity_id": entity_id,
-        "created_by": actor_name, "created_at": now_iso(), "updated_at": now_iso(),
+        "created_by": actor_name, "created_by_id": actor_doc.get("id", ""),
+        "created_at": now_iso(), "updated_at": now_iso(),
     }
     await db.design_gallery.insert_one(doc)
-    return safe_doc(doc)
+    return studio.enrich(safe_doc(doc))
 
 
 async def list_gallery(scope: Dict[str, Any], tag: Optional[str] = None,
                        q: Optional[str] = None,
-                       viewer_id: Optional[str] = None) -> List[Dict[str, Any]]:
+                       viewer_id: Optional[str] = None,
+                       filters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+    from services import design_studio_service as studio
     query: Dict[str, Any] = dict(scope or {})
     if tag:
         query["tags"] = tag
+    for key in ("status", "design_type", "category_code", "created_by", "line_code"):
+        if (filters or {}).get(key):
+            query[key] = filters[key]
+    if (filters or {}).get("product_id"):
+        query["recommended_product_ids"] = filters["product_id"]
+    if (filters or {}).get("color_id"):
+        query["$or"] = [{"colors.color_id": filters["color_id"]},
+                        {"colorways.colors.color_id": filters["color_id"]}]
     rows = await db.design_gallery.find(query, {"_id": 0}).sort("created_at", -1).to_list(2000)
-    rows = [_rating_fields(safe_doc(r), viewer_id) for r in rows]
+    rows = [studio.enrich(_rating_fields(safe_doc(r), viewer_id)) for r in rows]
     if q:
         s = q.lower()
         rows = [r for r in rows if s in (r.get("title", "") or "").lower()
+                or s in (r.get("code", "") or "").lower()
                 or s in (r.get("story", "") or "").lower()
                 or any(s in (t or "").lower() for t in (r.get("tags") or []))]
     return rows
@@ -181,9 +202,10 @@ async def list_gallery(scope: Dict[str, Any], tag: Optional[str] = None,
 
 async def get_gallery(gallery_id: str,
                       viewer_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
-    return _rating_fields(
+    from services import design_studio_service as studio
+    return studio.enrich(_rating_fields(
         safe_doc(await db.design_gallery.find_one({"id": gallery_id}, {"_id": 0})),
-        viewer_id)
+        viewer_id))
 
 
 async def update_gallery(gallery_id: str, patch: Dict[str, Any]) -> Dict[str, Any]:
@@ -202,8 +224,30 @@ async def update_gallery(gallery_id: str, patch: Dict[str, Any]) -> Dict[str, An
         updates["product_id"] = patch["product_id"]
     if patch.get("tags") is not None:
         updates["tags"] = _clean_tags(patch["tags"])
+        from services import design_studio_service as _studio
+        await _studio.remember_tags(updates["tags"])
     if patch.get("line_code") is not None:      # FASE L
         updates["line_code"] = _lines.norm(patch["line_code"])
+    # Design Studio — kategori, rekomendasi produk, palet warna (wajib dari master).
+    if patch.get("category_code") is not None:
+        from services import design_studio_service as _studio
+        cat_code = str(patch["category_code"]).strip().upper()
+        dtype = str(patch.get("design_type") or cur.get("design_type") or "motif").lower()
+        cat = await _studio.category_of(dtype, cat_code) if cat_code else None
+        if cat_code and not cat:
+            raise ValueError(f"Kategori '{cat_code}' tidak ada untuk jenis {dtype}.")
+        updates["category_code"] = cat_code
+        updates["category_name"] = (cat or {}).get("name", "")
+    if patch.get("recommended_product_ids") is not None:
+        from services import design_studio_service as _studio
+        prods = await _studio.resolve_products(patch["recommended_product_ids"])
+        updates["recommended_products"] = prods
+        updates["recommended_product_ids"] = [p["id"] for p in prods]
+    if patch.get("colors") is not None:
+        from services import design_studio_service as _studio
+        updates["colors"] = await _studio.resolve_colors(patch["colors"])
+        if patch.get("color_count") is None:
+            updates["color_count"] = len(updates["colors"])
     # FASE F (PS-14) — atribut master desain.
     if patch.get("code") is not None:
         code = str(patch["code"]).strip().upper()
@@ -343,7 +387,9 @@ async def approve_design(gallery_id: str, actor_name: str, note: str = "") -> Di
     return await get_gallery(gallery_id)
 
 
-async def add_file(gallery_id: str, filename: str, content_type: str, data: bytes) -> Dict[str, Any]:
+async def add_file(gallery_id: str, filename: str, content_type: str, data: bytes,
+                   kind: str = "artwork", caption: str = "", uploaded_by: str = "",
+                   colorway_id: str = "") -> Dict[str, Any]:
     cur = await db.design_gallery.find_one({"id": gallery_id}, {"_id": 0})
     if not cur:
         raise ValueError("Entri galeri tidak ditemukan.")
@@ -354,10 +400,21 @@ async def add_file(gallery_id: str, filename: str, content_type: str, data: byte
     fmeta = {
         "id": new_id("file"), "filename": filename, "path": path,
         "content_type": ct, "size": len(data), "uploaded_at": now_iso(),
+        "kind": kind or "artwork", "caption": (caption or "").strip(),
+        "uploaded_by": uploaded_by, "version": int(cur.get("version") or 1),
+        "colorway_id": colorway_id or "",
     }
+    push: Dict[str, Any] = {"files": fmeta}
+    if kind in ("reference", "mockup", "artwork"):
+        from services import design_studio_service as _studio
+        push["timeline"] = _studio.event({"name": uploaded_by}, f"{kind}_uploaded", filename,
+                                         version=fmeta["version"], file_id=fmeta["id"])
     await db.design_gallery.update_one(
         {"id": gallery_id},
-        {"$push": {"files": fmeta}, "$set": {"updated_at": now_iso()}})
+        {"$push": push, "$set": {"updated_at": now_iso()}})
+    if colorway_id:
+        await db.design_gallery.update_one({"id": gallery_id, "colorways.id": colorway_id},
+                                          {"$push": {"colorways.$.file_ids": fmeta["id"]}})
     return safe_doc(fmeta)
 
 
@@ -374,7 +431,7 @@ AI_KIND = "ai_illustration"
 
 
 def is_artwork(f: Dict[str, Any]) -> bool:
-    return (f.get("kind") or "artwork") != AI_KIND
+    return (f.get("kind") or "artwork") == "artwork"
 
 
 def artworks(doc: Dict[str, Any]) -> List[Dict[str, Any]]:

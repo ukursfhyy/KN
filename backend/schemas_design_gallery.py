@@ -4,7 +4,7 @@ Di-re-export via `schemas.py`. Koleksi `design_gallery` (entity-scoped). Upload
 gambar via storage lokal (services.storage_service). Lihat memory/PLAN_HRD.md §H5
 (keputusan 3a) + §10b HR-Q5 (AI Anthropic Claude langsung, graceful).
 """
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -25,6 +25,10 @@ class GalleryInput(BaseModel):
     color_count: Optional[int] = None
     screen_count: Optional[int] = None
     line_code: str = ""              # FASE L — lini kerja MD (kosong = semua lini)
+    # Design Studio — kategori per jenis, rekomendasi produk (opsional), palet warna dari master.
+    category_code: str = ""
+    recommended_product_ids: List[str] = []
+    colors: List[Dict[str, Any]] = []      # [{color_id, role?}] — wajib ada di color_library
 
 
 class GalleryUpdate(BaseModel):
@@ -40,6 +44,9 @@ class GalleryUpdate(BaseModel):
     screen_count: Optional[int] = None
     line_code: Optional[str] = None   # FASE L
     status: Optional[str] = None      # draft | approved | retired
+    category_code: Optional[str] = None
+    recommended_product_ids: Optional[List[str]] = None
+    colors: Optional[List[Dict[str, Any]]] = None
 
 
 class DesignVersionIn(BaseModel):
@@ -48,6 +55,41 @@ class DesignVersionIn(BaseModel):
     repeat_cm: Optional[float] = None
     color_count: Optional[int] = None
     screen_count: Optional[int] = None
+
+
+class DesignTransitionIn(BaseModel):
+    """Aksi siklus hidup: catatan (wajib untuk revisi/arsip) + nilai opsional saat ACC."""
+    note: str = ""
+    score: Optional[float] = None
+
+
+class DesignScoreIn(BaseModel):
+    """Nilai versi 0–2 kelipatan 0,25 (divalidasi di service)."""
+    score: float
+    note: str = ""
+
+
+class DesignFeedbackIn(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+    version: Optional[int] = None
+
+
+class ColorwayIn(BaseModel):
+    name: Optional[str] = None
+    note: Optional[str] = None
+    colors: Optional[List[Dict[str, Any]]] = None
+    is_default: Optional[bool] = None
+
+
+class CategoryIn(BaseModel):
+    design_type: str
+    code: str
+    name: str
+
+
+class CategoryPatch(BaseModel):
+    name: Optional[str] = None
+    status: Optional[str] = None
 
 
 class DesignApproveIn(BaseModel):

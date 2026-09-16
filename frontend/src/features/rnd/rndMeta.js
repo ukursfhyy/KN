@@ -52,10 +52,37 @@ export const DESIGN_TYPE_LABEL = {
 };
 
 export const DESIGN_STATUS_META = {
-  draft: { label: "Draf", cls: "pill-muted" },
-  approved: { label: "Disahkan", cls: "pill-success" },
-  retired: { label: "Tidak dipakai", cls: "pill-danger" },
+  draft: { label: "Draf", cls: "pill-muted", tone: "#8E8E93" },
+  pending_approval: { label: "Diajukan", cls: "pill-info", tone: "#0058CC" },
+  in_review: { label: "Dalam Review", cls: "pill-warning", tone: "#A05000" },
+  revision: { label: "Perlu Revisi", cls: "pill-danger", tone: "#C62828" },
+  approved: { label: "Disetujui (ACC)", cls: "pill-success", tone: "#1A7A3A" },
+  active: { label: "Aktif / Produksi", cls: "pill-success", tone: "#0F6E4A" },
+  archived: { label: "Diarsipkan", cls: "pill-muted", tone: "#6B6B73" },
+  retired: { label: "Diarsipkan", cls: "pill-muted", tone: "#6B6B73" },
 };
+
+/** Urutan tahapan siklus hidup desain untuk stepper (revisi = cabang balik ke desainer). */
+export const DESIGN_LIFECYCLE_STEPS = [
+  { key: "draft", label: "Draf" },
+  { key: "pending_approval", label: "Diajukan" },
+  { key: "in_review", label: "Review" },
+  { key: "approved", label: "ACC" },
+  { key: "active", label: "Aktif" },
+];
+
+export const DESIGN_EVENT_LABEL = {
+  created: "Desain dibuat", submit: "Diajukan untuk review", start_review: "Review dimulai",
+  request_revision: "Diminta revisi", approve: "Disetujui (ACC)", activate: "Diaktifkan untuk produksi",
+  archive: "Diarsipkan", reopen: "Dibuka kembali", new_version: "Versi baru",
+  scored: "Diberi nilai", feedback: "Umpan balik", colorway_added: "Alternatif warna ditambah",
+  artwork_uploaded: "Artwork diunggah", reference_uploaded: "Foto referensi diunggah",
+  mockup_uploaded: "Mockup diunggah",
+};
+
+export const SCORE_STEPS = Array.from({ length: 9 }, (_, i) => i * 0.25);
+export const fmtScore = (v) => (v === null || v === undefined || v === "" ? "—"
+  : Number(v).toFixed(2).replace(".", ",").replace(/,?0+$/, "").replace(/,$/, "") || "0");
 
 export const lifecycleMeta = (value) =>
   LIFECYCLE_META[(value || "produksi").toLowerCase()] || LIFECYCLE_META.produksi;

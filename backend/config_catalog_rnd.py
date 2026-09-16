@@ -143,6 +143,53 @@ E("rnd.require_design_for_proofing", group="rnd", type="bool", default=True, sco
   roles=_MANAGER_TOO, permission=_RND_PERM)
 
 # ═══════════════════════════════════════════════════════════════════════════
+# DESIGN STUDIO — KODE OTOMATIS & AMBANG NILAI
+# ═══════════════════════════════════════════════════════════════════════════
+E("rnd.design_code_pattern", group="rnd", type="text", default="{DESIGNER}-{TYPE}-{CAT}-{SEQ}",
+  scopes=G, label="Pola kode desain otomatis",
+  help="Kode desain dibentuk otomatis saat desain dibuat. Placeholder: {DESIGNER} = inisial "
+       "desainer (mis. BDI), {TYPE} = prefix jenis (motif/pattern/artwork), {CAT} = kode kategori "
+       "(mis. SLR), {ENTITY} = prefix badan usaha, {SEQ} = nomor urut.",
+  impact="Mengubah pola hanya berlaku untuk desain BARU; kode lama tidak berubah.",
+  example="{DESIGNER}-{TYPE}-{CAT}-{SEQ} → BDI-PTR-SLR-001",
+  consumers=("services/design_studio_service.py:next_code",), risk="low",
+  roles=_MANAGER_TOO, permission=_RND_PERM)
+
+E("rnd.design_code_seq_digits", group="rnd", type="int", default=3, min=2, max=6, step=1,
+  scopes=G, label="Jumlah digit nomor urut kode desain",
+  help="Panjang nomor urut di akhir kode desain (3 → 001, 4 → 0001).",
+  impact="Berlaku untuk desain baru saja.", example="3 → BDI-PTR-SLR-001",
+  consumers=("services/design_studio_service.py:next_code",), risk="low",
+  roles=_MANAGER_TOO, permission=_RND_PERM)
+
+E("rnd.design_prefix_motif", group="rnd", type="text", default="MTF", scopes=G,
+  label="Prefix kode untuk jenis Motif", help="Singkatan jenis 'motif' di kode desain.",
+  impact="Berlaku untuk desain baru saja.", example="MTF",
+  consumers=("services/design_studio_service.py:next_code",), risk="low",
+  roles=_MANAGER_TOO, permission=_RND_PERM)
+
+E("rnd.design_prefix_pattern", group="rnd", type="text", default="PTR", scopes=G,
+  label="Prefix kode untuk jenis Pattern", help="Singkatan jenis 'pattern' di kode desain.",
+  impact="Berlaku untuk desain baru saja.", example="PTR",
+  consumers=("services/design_studio_service.py:next_code",), risk="low",
+  roles=_MANAGER_TOO, permission=_RND_PERM)
+
+E("rnd.design_prefix_artwork", group="rnd", type="text", default="ART", scopes=G,
+  label="Prefix kode untuk jenis Artwork", help="Singkatan jenis 'artwork' di kode desain.",
+  impact="Berlaku untuk desain baru saja.", example="ART",
+  consumers=("services/design_studio_service.py:next_code",), risk="low",
+  roles=_MANAGER_TOO, permission=_RND_PERM)
+
+E("rnd.design_acc_min_score", group="rnd", type="decimal", default=1.5, min=0, max=2, step=0.25,
+  scopes=G, label="Nilai minimum agar versi desain bisa ACC",
+  help="Setiap versi desain dinilai penilai pada skala 0–2 (kelipatan 0,25). Versi hanya bisa "
+       "disetujui (ACC) bila nilainya mencapai ambang ini.",
+  impact="Menaikkan ambang membuat lebih banyak versi harus direvisi sebelum ACC.",
+  example="1,5 → versi bernilai 1,25 wajib revisi",
+  consumers=("services/design_studio_service.py:transition",), risk="medium",
+  roles=_MANAGER_TOO, permission=_RND_PERM)
+
+# ═══════════════════════════════════════════════════════════════════════════
 # PS-18 — ESKALASI SLA OTOMATIS (round yang lewat tenggat tidak boleh diam)
 # ═══════════════════════════════════════════════════════════════════════════
 E("rnd.sla_escalate_admin_days", group="rnd", type="duration", default=3, min=1, max=30,

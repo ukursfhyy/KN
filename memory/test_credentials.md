@@ -12,6 +12,9 @@ Konteks badan usaha uji: ent_ksc (header X-Entity-Id; pilih badan usaha yang sam
 - Admin Sales: salesadmin@kainnusantara.id / demo12345
 - Finance: finance@kainnusantara.id / demo12345
 - Gudang: warehouse@kainnusantara.id / demo12345
+- Desainer: designer@kainnusantara.id / demo12345 (Sari Melati, role designer, entitas ent_ksc)
+
+DESIGN STUDIO (2026-09-16): layar `?view=rnd-designs&entity=ent_ksc` (hub Desainer → tab "Desain & Pattern"). Klik kartu `design-card-<id>` membuka halaman detail (`design-detail-page`). Kode desain otomatis (mis. BDI-PTR-SLR-001). Nilai versi 0–2 kelipatan 0,25; ambang ACC default 1,5 (`rnd.design_acc_min_score`). Aksi penilai (review/nilai/ACC/aktifkan/arsip) hanya admin/manager; desainer: buat, unggah, ajukan, versi baru, umpan balik, colorway.
 
 Login UI testid: login-email-input, login-password-input, login-submit-button.
 Routing uji: ?view=md-products&entity=ent_ksc · ?view=rnd-specs&entity=ent_ksc · ?view=sales.

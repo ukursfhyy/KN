@@ -65,6 +65,9 @@ async def _guard(gallery_id: str, ctx) -> Dict[str, Any]:
 async def list_gallery(request: Request, entity_id: Optional[str] = Query(None),
                        tag: Optional[str] = Query(None),
                        q: Optional[str] = Query(None),
+                       status: str = Query(""), design_type: str = Query(""),
+                       category_code: str = Query(""), created_by: str = Query(""),
+                       product_id: str = Query(""), color_id: str = Query(""),
                        line: str = Query("", description="FASE L — penyaring lini")) -> List[Dict[str, Any]]:
     viewer = await _perm_view(request)
     ctx = await entity_ctx(request)
@@ -72,7 +75,10 @@ async def list_gallery(request: Request, entity_id: Optional[str] = Query(None),
     # FASE L — galeri desain ikut berpagar lini (artwork printing bukan urusan staf woven).
     from services import line_scope as _lines
     scope = _lines.narrow(scope, viewer, line)
-    return await gallery.list_gallery(scope, tag, q, viewer_id=viewer.get("id"))
+    return await gallery.list_gallery(scope, tag, q, viewer_id=viewer.get("id"),
+                                      filters={"status": status, "design_type": design_type,
+                                               "category_code": category_code, "created_by": created_by,
+                                               "product_id": product_id, "color_id": color_id})
 
 
 @router.post("/design-gallery")
@@ -80,7 +86,8 @@ async def create_gallery(payload: GalleryInput, request: Request) -> Dict[str, A
     actor = await _perm_manage(request)
     ctx = await entity_ctx(request)
     try:
-        doc = await gallery.create_gallery(payload.model_dump(), actor["name"], ctx.active_entity_id)
+        doc = await gallery.create_gallery(payload.model_dump(), actor["name"], ctx.active_entity_id,
+                                           actor=actor)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     await audit(actor["name"], "design_gallery_create", "design_gallery", doc["id"],

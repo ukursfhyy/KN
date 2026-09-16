@@ -225,6 +225,49 @@ def compute_grade(row: Dict[str, Any], w: Dict[str, Any]) -> Dict[str, Any]:
             **{f"grade_{k}": v for k, v in grade_of(score).items()}}
 
 
+# ─── Design Studio — nilai versi & revisi per desainer ───────────────────────
+def _design_blank() -> Dict[str, Any]:
+    return {"designs": 0, "design_versions": 0, "design_scored": 0, "design_acc": 0,
+            "design_revisions": 0, "design_avg_score": None, "design_acc_rate": None}
+
+
+async def design_studio_stats(query: Optional[Dict[str, Any]], start: Optional[date]) -> Dict[str, Dict[str, Any]]:
+    """Agregat `design_gallery` per desainer (kunci = nama ternormalisasi) untuk satu periode."""
+    scope: Dict[str, Any] = {}
+    if query and query.get("entity_id") is not None:
+        scope["entity_id"] = query["entity_id"]
+    rows = await db.design_gallery.find(scope, {
+        "_id": 0, "created_by": 1, "created_at": 1, "versions": 1, "timeline": 1}).to_list(5000)
+
+    def in_period(iso: Any) -> bool:
+        d = _as_date(iso)
+        return not start or (d is not None and d >= start)
+
+    agg: Dict[str, Dict[str, Any]] = {}
+    for d in rows:
+        name = str(d.get("created_by") or "").strip()
+        if not name:
+            continue
+        a = agg.setdefault(_norm(name), {**_design_blank(), "designer": name, "_score_sum": 0.0})
+        versions = [v for v in (d.get("versions") or []) if in_period(v.get("at"))]
+        if versions or in_period(d.get("created_at")):
+            a["designs"] += 1
+        a["design_versions"] += len(versions)
+        for v in versions:
+            if v.get("score") is not None:
+                a["design_scored"] += 1
+                a["_score_sum"] += float(v["score"])
+            if v.get("acc"):
+                a["design_acc"] += 1
+        a["design_revisions"] += sum(1 for e in (d.get("timeline") or [])
+                                     if e.get("event") == "request_revision" and in_period(e.get("at")))
+    for a in agg.values():
+        a["design_avg_score"] = round(a["_score_sum"] / a["design_scored"], 2) if a["design_scored"] else None
+        a["design_acc_rate"] = _pct(int(a["design_acc"]), int(a["design_scored"]))
+        a.pop("_score_sum")
+    return agg
+
+
 # ─── Laporan utama ───────────────────────────────────────────────────────────
 async def designer_kpi(query: Optional[Dict[str, Any]] = None, *, period: str = "all",
                        entity_id: str = "", division: str = "") -> Dict[str, Any]:
@@ -303,6 +346,21 @@ async def designer_kpi(query: Optional[Dict[str, Any]] = None, *, period: str = 
         row.update(compute_grade(row, w))
         items.append(row)
 
+    # Design Studio — nilai versi (0–2) & jumlah revisi dari master desain ikut dilaporkan.
+    dstats = await design_studio_stats(query, start)
+    known = {_norm(r["designer"]) for r in items}
+    for name, ds in dstats.items():
+        if _norm(name) not in known:
+            row = {**_blank(name), "samples": 0, "rework": 0, "late_total": 0,
+                   "on_time_pct": None, "acc_rate": None, "rework_pct": None,
+                   "avg_score": None, "avg_days": None, "cost_total": 0.0}
+            row.pop("score_sum"); row.pop("score_n"); row.pop("days_sum"); row.pop("days_n")
+            row.pop("on_time"); row.pop("cost")
+            row.update(compute_grade(row, w))
+            items.append(row)
+    for row in items:
+        row.update(dstats.get(_norm(row["designer"]), _design_blank()))
+
     items.sort(key=lambda r: (-(r["grade_score"] if r["grade_score"] is not None else -1),
                               -int(r["acc"]), str(r["designer"])))
     for i, row in enumerate(items, start=1):
@@ -359,6 +417,14 @@ def _summary(items: List[Dict[str, Any]]) -> Dict[str, Any]:
         "best_designer": graded[0]["designer"] if graded else "",
         "best_grade": graded[0]["grade_letter"] if graded else "",
         "cost_total": round(sum(float(r["cost_total"]) for r in items), 2),
+        # Design Studio
+        "designs": sum(int(r.get("designs") or 0) for r in items),
+        "design_versions": sum(int(r.get("design_versions") or 0) for r in items),
+        "design_acc": sum(int(r.get("design_acc") or 0) for r in items),
+        "design_revisions": sum(int(r.get("design_revisions") or 0) for r in items),
+        "design_avg_score": round(sum(float(r["design_avg_score"]) * int(r["design_scored"]) for r in items if r.get("design_avg_score") is not None)
+                                  / sum(int(r["design_scored"]) for r in items if r.get("design_avg_score") is not None), 2)
+        if any(r.get("design_avg_score") is not None for r in items) else None,
     }
 
 

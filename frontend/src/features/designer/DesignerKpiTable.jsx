@@ -23,6 +23,13 @@ const COLS = [
   { key: "rework_pct", label: "Diulang", w: "78px", hint: "Revisi + tolak dari yang dinilai" },
   { key: "avg_score", label: "Rata skor", w: "80px", hint: "Skor penilaian manajer" },
   { key: "avg_days", label: "Rata hari", w: "80px", hint: "Lama round dari kirim ke setor" },
+  { key: "design_versions", label: "Versi desain", w: "84px",
+    hint: "Design Studio: jumlah versi desain yang dibuat pada periode ini" },
+  { key: "design_avg_score", label: "Nilai desain", w: "88px",
+    hint: "Design Studio: rata-rata nilai versi (skala 0–2)" },
+  { key: "design_acc", label: "ACC desain", w: "78px", hint: "Design Studio: versi yang disetujui (ACC)" },
+  { key: "design_revisions", label: "Revisi desain", w: "88px",
+    hint: "Design Studio: berapa kali diminta revisi oleh penilai" },
   { key: "grade_score", label: "Nilai", w: "96px", hint: "Nilai komposit + huruf" },
   { key: "report", label: "Rapor", w: "110px", hint: "Unduh rapor 1 halaman (PDF)", noSort: true },
 ];
@@ -83,7 +90,7 @@ export default function DesignerKpiTable({ items, onSelect, selected, loading = 
 
   return (
     <div className="overflow-x-auto">
-      <div className="min-w-[1200px]">
+      <div className="min-w-[1560px]">
         <div className="grid px-1 pb-1 text-[9.5px] font-bold uppercase text-[#8E8E93]"
           style={{ gridTemplateColumns: GRID }}>
           {COLS.map((c) => (
@@ -158,6 +165,20 @@ export default function DesignerKpiTable({ items, onSelect, selected, loading = 
                 </span>
                 <span className="tabular-nums">{num(r.avg_score)}</span>
                 <span className="tabular-nums">{num(r.avg_days)}</span>
+                <span className="tabular-nums" data-testid={`designer-kpi-design-versions-${r.designer}`}>
+                  {r.design_versions || 0}
+                  {r.designs > 0 && <span className="ml-1 text-[9.5px] text-[#9A9BA3]">({r.designs} desain)</span>}
+                </span>
+                <span className="tabular-nums font-semibold" data-testid={`designer-kpi-design-score-${r.designer}`}
+                  style={{ color: r.design_avg_score === null || r.design_avg_score === undefined ? "#8E8E93"
+                    : r.design_avg_score >= 1.5 ? "#1B7F4B" : r.design_avg_score >= 1 ? "#B26A00" : "#C0392B" }}>
+                  {r.design_avg_score === null || r.design_avg_score === undefined ? "—"
+                    : `${String(r.design_avg_score).replace(".", ",")}/2`}
+                </span>
+                <span className="tabular-nums font-bold text-[#1B7F4B]">{r.design_acc || 0}</span>
+                <span className="tabular-nums text-[#B26A00]" data-testid={`designer-kpi-design-revisions-${r.designer}`}>
+                  {r.design_revisions || 0}
+                </span>
                 <span className="flex items-center gap-1"
                   title={r.grade_score === null ? "Data belum cukup untuk dinilai"
                     : `Nilai dasar ${r.grade_base} − penalti ${r.grade_penalty} = `

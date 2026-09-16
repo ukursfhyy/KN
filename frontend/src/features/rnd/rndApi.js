@@ -93,6 +93,44 @@ export const uploadDesignFile = (id, file) => {
   return axios.post(`${API}/design-gallery/${id}/files`, fd).then((r) => r.data);
 };
 export const designFileUrl = (id, fileId) => `${API}/design-gallery/${id}/files/${fileId}`;
+export const getDesign = (id) => axios.get(`${API}/design-gallery/${id}`).then((r) => r.data);
+export const deleteDesignFile = (id, fileId) =>
+  axios.delete(`${API}/design-gallery/${id}/files/${fileId}`).then((r) => r.data);
+
+// ── Design Studio — lifecycle, nilai, colorway, kategori, tag, kode otomatis ─
+export const studioMeta = (params) =>
+  axios.get(`${API}/design-studio/meta`, { params }).then((r) => r.data);
+export const studioNextCode = (params) =>
+  axios.get(`${API}/design-studio/next-code`, { params }).then((r) => r.data);
+export const studioTags = (q) =>
+  axios.get(`${API}/design-studio/tags`, { params: { q } }).then((r) => r.data);
+export const studioCategories = (params) =>
+  axios.get(`${API}/design-studio/categories`, { params }).then((r) => r.data);
+export const createCategory = (body) =>
+  axios.post(`${API}/design-studio/categories`, body).then((r) => r.data);
+export const patchCategory = (id, body) =>
+  axios.patch(`${API}/design-studio/categories/${id}`, body).then((r) => r.data);
+export const designLifecycle = (id, action, body = {}) =>
+  axios.post(`${API}/design-gallery/${id}/lifecycle/${action}`, body).then((r) => r.data);
+export const designNewVersion = (id, body) =>
+  axios.post(`${API}/design-gallery/${id}/new-version`, body).then((r) => r.data);
+export const scoreDesignVersion = (id, version, body) =>
+  axios.post(`${API}/design-gallery/${id}/versions/${version}/score`, body).then((r) => r.data);
+export const addDesignFeedback = (id, body) =>
+  axios.post(`${API}/design-gallery/${id}/feedback`, body).then((r) => r.data);
+export const addColorway = (id, body) =>
+  axios.post(`${API}/design-gallery/${id}/colorways`, body).then((r) => r.data);
+export const updateColorway = (id, cwId, body) =>
+  axios.put(`${API}/design-gallery/${id}/colorways/${cwId}`, body).then((r) => r.data);
+export const deleteColorway = (id, cwId) =>
+  axios.delete(`${API}/design-gallery/${id}/colorways/${cwId}`).then((r) => r.data);
+export const uploadDesignKindFile = (id, kind, file, params = {}) => {
+  const fd = new FormData();
+  fd.append("file", file);
+  return axios.post(`${API}/design-gallery/${id}/files-kind/${kind}`, fd, { params }).then((r) => r.data);
+};
+export const listProductsLite = () =>
+  axios.get(`${API}/products`).then((r) => (Array.isArray(r.data) ? r.data : r.data?.items || []));
 
 // ── Master pendukung ─────────────────────────────────────────────────────────
 export const listColors = () => axios.get(`${API}/color-library`).then((r) => r.data);
